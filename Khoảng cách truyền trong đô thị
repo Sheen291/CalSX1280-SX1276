@@ -1,0 +1,51 @@
+import math
+ 
+def calculate_ecc33_loss(frequency, distance, hb, hr, large_city=False):
+    #Afs hao tổn tự do
+    Afs = 92.4 + 20*math.log10(distance) + 20*math.log10(frequency)
+    #Abm hao tổn trung bình
+    Abm = 20.41 + 9.83*math.log10(distance) + 7.89 * math.log10(frequency) + 9.56 * (math.log10(frequency) ** 2)
+    #hệ số Gb
+    Gb = math.log10(hb / 200) * (13.958 + 5.8 * math.log10(distance)) ** 2
+    #hệ số Gr
+    if large_city: #đối với đô thị rộng
+        Gr = 0.759 * hr - 1.862
+    else: #đối với đô thị vừa
+        Gr = (42.57 + 13.7 * math.log10(frequency)) * (math.log10(hr) - 0.585)
+    #tổng tổn hao đường truyền
+    Lecc = Afs + Abm - Gb - Gr
+    return Lecc
+ 
+def find_max_distance(frequency, hb, hr, max_loss, large_city=False):
+    #tìm khoảng cách bằng phương pháp lặp
+    low, high = 0.001, 100  #chọn khoảng từ 1m đến 1km
+    while high - low > 1e-6:
+        mid = (low + high) / 2
+        loss = calculate_ecc33_loss(frequency, mid, hb, hr, large_city)
+        if loss > max_loss:
+            high = mid
+        else:
+            low = mid
+    return low
+ 
+#Input
+frequency = 2.4  #đơn vị GHz
+hb = 30  #chiều cao gateway (m) ~ Khoảng tầng 10 
+hr = 30  #chiều cao ăng-ten của node (m)
+power_tx = 13  #công suất phát (dBm), mặc định thường dùng 13dBm với các thiết bị LoRa
+ 
+#Bảng receiver sensitivity
+sensitivity_table = {
+    203: [-109, -111, -115, -118, -121, -124, -127, -130],
+    406: [-107, -110, -113, -116, -119, -122, -125, -128],
+    812: [-105, -108, -112, -115, -117, -120, -123, -126],
+    1625: [-99, -103, -106, -109, -111, -114, -117, -120],
+}
+ 
+#tính khoảng cách truyền tối đa cho mỗi băng thông và SF
+for bandwidth, sensitivities in sensitivity_table.items():
+    print(f"\nBandwidth: {bandwidth} kHz")
+    for sf, sensitivity in enumerate(sensitivities, start=5):
+        max_loss = power_tx - sensitivity  #tổn hao tối đa
+        max_distance = find_max_distance(frequency, hb, hr, max_loss, large_city=False)
+        print(f"  SF{sf}: Max Distance = {max_distance*1000:.5f} m")
