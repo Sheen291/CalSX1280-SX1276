@@ -1,0 +1,76 @@
+import math
+
+def calculate_toa_sx1280(SF, BW, CR, PayloadLength, NsymbolPreamble=12, HeaderFlag=1):
+    """
+    Tính Time on Air (ToA) của SX1280.
+
+    Các thông số kỹ thuật:
+    SF (int): Spreading Factor (5 to 12)
+    BW (float): Băng thông kHz
+    CR (float): Coding Rate (4/5,...)
+    PayloadLength (int): độ dài payload tính theo byte
+    NsymbolPreamble (int): số ký tự đầu (mặc định: 12)
+    HeaderFlag (int): 1 nếu có tiêu đề, 0 nếu không có
+
+    Kết quả:
+    float: Time on Air tính theo ms
+    """
+    BW = BW * 1e3  # Chuyển KHz sang Hz
+
+    #Tính số ký hiệu payload npayload
+    Nbit_CRC = 16  # CRC=16 nếu dùng mã kiểm lỗi, =0 nếu không dùng
+    Nsymbol_header = 20 if HeaderFlag == 1 else 0
+
+    Npayload = 8 + max(math.ceil((8*PayloadLength + Nbit_CRC - 4*SF + Nsymbol_header)
+                                / (4*SF) * (CR+4)), 0)
+
+    #Tổng số ký tự
+    Nsymbol = NsymbolPreamble + 6.25 + Npayload
+
+    #Tính Time on Air theo ms
+    ToA = Nsymbol * (2 ** SF) / BW * 1e3
+    return ToA
+
+def calculate_toa_sx1276(SF, BW, CR, DE, IH, CRC, PL):
+    """
+    Tính Time on Air (ToA) cho SX1276.
+
+    Thông số kỹ thuật:
+    SF (int): Spreading Factor (6 to 12)
+    BW (float): Băng thông kHz
+    CR (float): Coding Rate 
+    DE (int): chế độ truyền nhanh hoặc chậm (0 nếu truyền nhanh, ngược lại thì 1)
+    IH (int): nếu có tiêu đề (0), không có tiêu đề(1)
+    CRC (int): kiểm lỗi khi truyền CRC (1 nếu sử dụng, 0 nếu không dùng)
+    PL (int): Độ dài payload theo bytes
+
+    Kết quả:
+    float: Time on Air theo ms
+    """
+    BW = BW * 1e3
+
+    #Tính npayload
+    numerator = 8*PL - 4*SF + 28 + 16*CRC - 20*IH
+    denominator = 4 * (SF - 2 * DE)
+    npayload = 8 + max(math.ceil(numerator/denominator) * (CR + 4), 0)
+
+    #Tính Tpreamble thời gian truyền preamble
+    npreamble = 12  # mặc định đang 12 ký hiệu
+    Tpreamble = (npreamble + 4.25)*(2 ** SF)/BW
+
+    #Tính thời gian truyền payload
+    Tpayload = npayload*(2 ** SF)/BW
+
+    #Tổng thời gian truyền Time on Air
+    ToA = (Tpreamble + Tpayload) * 1e3
+    return ToA
+
+
+# SX1280
+toa_sx1280 = calculate_toa_sx1280(SF=5, BW=1625, CR=4/5, PayloadLength=20,
+                                    NsymbolPreamble=12, HeaderFlag=1)
+print(f"Time on Air (SX1280): {toa_sx1280:.2f} ms")
+
+# SX1276
+toa_sx1276 = calculate_toa_sx1276(SF=7, BW=500, CR=4/5, DE=0, IH=1, CRC=1, PL=20)
+print(f"Time on Air (SX1276): {toa_sx1276:.2f} ms")
